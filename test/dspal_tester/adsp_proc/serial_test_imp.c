@@ -132,145 +132,8 @@ void multi_port_read_callback(void *context, char *buffer, size_t num_bytes)
 		LOG_ERR("error: read callback with no data in the buffer");
 	}
 }
-void dspal_tester_serial_read_callback(void *context, char *buffer, size_t num_bytes)
-{
-	int rx_dev_id = (int)context;
-	char rx_buffer[SERIAL_SIZE_OF_DATA_BUFFER];
-
-	if ((buffer != NULL ) && (num_bytes > 0)) {
-		memcpy(rx_buffer, buffer, num_bytes);
-		rx_buffer[0] = 0;
-		LOG_ERR("/dev/tty-%d read callback received bytes: %d",
-			 rx_dev_id, num_bytes);
-
-        for (int i = 0; i < (int)num_bytes; i++) 
-        {
-            //LOG_ERR("buffer[%d]=%x", i , buffer[i]);
-        }
-		if (num_bytes != 12)
-			LOG_ERR("!!!!!!!!!!!!!!!!!!available bytes %d", num_bytes);
-
-	} else {
-		LOG_ERR("error: read callback with no data in the buffer");
-	}
-}
 
 
-void* dspal_tester_serial_write(void* esc_fd)
-{
-    int fd = (int)esc_fd; 
-
-    /*Spin motor*/
-    //uint8_t out[] = {0xAF, 0x0F, 0x01, 0x51, 0x00, 0x50, 0x00, 0x50, 0x00, 0x50, 0x00, 0xFF, 0x0F, 0x3F, 0xF6}; 
-    int packet_size = sizeof(tx_data); 
-
-    for (int i = 0; i < 10000; i++) 
-    {
-        int num_bytes_written = write(fd,(const char *)tx_data,packet_size);
-
-        if (num_bytes_written == packet_size) {
-            LOG_INFO("written %d bytes for i = %d ", num_bytes_written,i);
-
-        } else {
-            LOG_ERR("failed to write");
-            return NULL; 
-        }
-
-        usleep(10000); 
-		//usleep(1000*1000); //added for serial TX debug;
-    }
-
-#if 0 
-    /* Assign IDs: 
-      Front Left 0:  0xAF, 0x06, 0x0B, 0x00, 0x96, 0xF1
-      Rear Left 1:   0xAF, 0x06, 0x0B, 0x01, 0x57, 0x31
-      Rear Right 2:  0xAF, 0x06, 0x0B, 0x02, 0x17, 0x30
-      Front Right 3: 0xAF, 0x06, 0x0B, 0x03, 0xD6, 0xF0 
-    */ 
-
-    uint8_t id_assign[] = {0xAF, 0x06, 0x0B, 0x01, 0x57, 0x31}; 
-    int packet_size = sizeof(id_assign); 
-
-    int num_bytes_written = write(fd,(const char *)id_assign,packet_size);
-
-    if (num_bytes_written == packet_size) {
-        LOG_INFO("written %d bytes ", num_bytes_written);
-
-    } else {
-        LOG_ERR("failed to write");
-        return NULL; 
-    }
-    usleep(100); 
-#endif
-
-    return NULL; 
-}
-
-int dspal_tester_serial_open_write(void)
-{
-    LOG_INFO("beginning serial device write test");
-	int result = SUCCESS;
-
-    int esc_fd = open("/dev/tty-5", O_RDWR);
-    LOG_INFO("open /dev/tty-2 O_RDWR mode %s", 
-             (esc_fd < SUCCESS) ? "fail" : "succeed");
-	
-    if (esc_fd < SUCCESS) {
-        result = ERROR; 
-        goto exit;
-    }
-	
-	struct dspal_serial_ioctl_receive_data_callback receive_callback;
-	receive_callback.rx_data_callback_func_ptr = dspal_tester_serial_read_callback;
-	receive_callback.context = NULL;
-	result = ioctl(esc_fd, 
-		       SERIAL_IOCTL_SET_RECEIVE_DATA_CALLBACK,
-		       (void *)&receive_callback);
-	if (result < SUCCESS) {
-		close(esc_fd);
-		esc_fd = -1;
-	}
-
-    pthread_t thread;
-    pthread_attr_t attr;
-    size_t stacksize = 2 * 1024;
-
-    int rv = pthread_attr_init(&attr);
-
-    if (rv != 0) { FAIL("pthread_attr_init returned error"); }
-
-    rv = pthread_attr_setstacksize(&attr, stacksize);
-
-    if (rv != 0) { FAIL("pthread_attr_setstacksize returned error"); }
-
-    /*
-     * Create the thread passing a reference to the cond structure
-     * just initialized.
-     */
-    rv = pthread_create(&thread, &attr, dspal_tester_serial_write, (void*)esc_fd);
-
-    if (rv != 0) {
-        LOG_ERR("error pthread_create: %d", rv);
-        goto exit;
-    }
-
-    
-    rv = pthread_join(thread, NULL);
-
-	if (rv != 0) {
-		LOG_ERR("error pthread_join: %d", rv);
-		goto exit;
-	}
-        
-	close(esc_fd);
-	
-	
-exit:
-	LOG_INFO("serial multi-port open test %s",
-		 result == SUCCESS ? "PASSED" : "FAILED");
-
-	return result;
-}
 /**
 * @brief Test multiple serial device at the same time for open,write,read,close.
 *
@@ -556,6 +419,145 @@ exit:
 	return result;
 }
 
+void* dspal_tester_serial_write(void* esc_fd)
+{
+    int fd = (int)esc_fd; 
+
+    /*Spin motor*/
+    //uint8_t out[] = {0xAF, 0x0F, 0x01, 0x51, 0x00, 0x50, 0x00, 0x50, 0x00, 0x50, 0x00, 0xFF, 0x0F, 0x3F, 0xF6}; 
+    int packet_size = sizeof(tx_data); 
+
+    for (int i = 0; i < 10000; i++) 
+    {
+        int num_bytes_written = write(fd,(const char *)tx_data,packet_size);
+
+        if (num_bytes_written == packet_size) {
+            LOG_INFO("written %d bytes for i = %d ", num_bytes_written,i);
+
+        } else {
+            LOG_ERR("failed to write");
+            return NULL; 
+        }
+
+        usleep(10000); 
+		//usleep(1000*1000); //added for serial TX debug;
+    }
+
+#if 0 
+    /* Assign IDs: 
+      Front Left 0:  0xAF, 0x06, 0x0B, 0x00, 0x96, 0xF1
+      Rear Left 1:   0xAF, 0x06, 0x0B, 0x01, 0x57, 0x31
+      Rear Right 2:  0xAF, 0x06, 0x0B, 0x02, 0x17, 0x30
+      Front Right 3: 0xAF, 0x06, 0x0B, 0x03, 0xD6, 0xF0 
+    */ 
+
+    uint8_t id_assign[] = {0xAF, 0x06, 0x0B, 0x01, 0x57, 0x31}; 
+    int packet_size = sizeof(id_assign); 
+
+    int num_bytes_written = write(fd,(const char *)id_assign,packet_size);
+
+    if (num_bytes_written == packet_size) {
+        LOG_INFO("written %d bytes ", num_bytes_written);
+
+    } else {
+        LOG_ERR("failed to write");
+        return NULL; 
+    }
+    usleep(100); 
+#endif
+
+    return NULL; 
+}
+void dspal_tester_serial_read_callback(void *context, char *buffer, size_t num_bytes)
+{
+	int rx_dev_id = (int)context;
+	char rx_buffer[SERIAL_SIZE_OF_DATA_BUFFER];
+
+	if ((buffer != NULL ) && (num_bytes > 0)) {
+		memcpy(rx_buffer, buffer, num_bytes);
+		rx_buffer[0] = 0;
+		LOG_ERR("/dev/tty-%d read callback received bytes: %d",
+			 rx_dev_id, num_bytes);
+
+        for (int i = 0; i < (int)num_bytes; i++) 
+        {
+            //LOG_ERR("buffer[%d]=%x", i , buffer[i]);
+        }
+		if (num_bytes != 12)
+			LOG_ERR("!!!!!!!!!!!!!!!!!!available bytes %d", num_bytes);
+
+	} else {
+		LOG_ERR("error: read callback with no data in the buffer");
+	}
+}
+
+int dspal_tester_serial_open_write(void)
+{
+    LOG_INFO("beginning serial device write test");
+	int result = SUCCESS;
+
+    int esc_fd = open("/dev/tty-5", O_RDWR);
+    LOG_INFO("open /dev/tty-5 O_RDWR mode %s", 
+             (esc_fd < SUCCESS) ? "fail" : "succeed");
+	
+    if (esc_fd < SUCCESS) {
+        result = ERROR; 
+        goto exit;
+    }
+	
+	struct dspal_serial_ioctl_receive_data_callback receive_callback;
+	receive_callback.rx_data_callback_func_ptr = dspal_tester_serial_read_callback;
+	receive_callback.context = (void *)(5);
+	result = ioctl(esc_fd, 
+		       SERIAL_IOCTL_SET_RECEIVE_DATA_CALLBACK,
+		       (void *)&receive_callback);
+	if (result < SUCCESS) {
+		close(esc_fd);
+		esc_fd = -1;
+	}
+	struct dspal_serial_ioctl_data_rate data_rate;
+	data_rate.bit_rate = DSPAL_SIO_BITRATE_250000;
+
+	ioctl(esc_fd, SERIAL_IOCTL_SET_DATA_RATE, (void *)&data_rate);
+
+    pthread_t thread;
+    pthread_attr_t attr;
+    size_t stacksize = 2 * 1024;
+
+    int rv = pthread_attr_init(&attr);
+
+    if (rv != 0) { FAIL("pthread_attr_init returned error"); }
+
+    rv = pthread_attr_setstacksize(&attr, stacksize);
+
+    if (rv != 0) { FAIL("pthread_attr_setstacksize returned error"); }
+
+    /*
+     * Create the thread passing a reference to the cond structure
+     * just initialized.
+     */
+    rv = pthread_create(&thread, &attr, dspal_tester_serial_write, (void*)esc_fd);
+
+    if (rv != 0) {
+        LOG_ERR("error pthread_create: %d", rv);
+        goto exit;
+    }
+    rv = pthread_join(thread, NULL);
+
+	if (rv != 0) {
+		LOG_ERR("error pthread_join: %d", rv);
+		goto exit;
+	}
+        
+	close(esc_fd);
+	
+	
+exit:
+	LOG_INFO("serial multi-port open test %s",
+		 result == SUCCESS ? "PASSED" : "FAILED");
+
+	return result;
+}
 
 
 /**
