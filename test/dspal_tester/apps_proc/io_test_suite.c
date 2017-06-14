@@ -41,16 +41,15 @@ int run_io_test_suite()
 	int test_results = TEST_PASS;
 
 	LOG_INFO("testing device path access");
-	test_results |= display_test_results( dspal_tester_spi_test(), "spi loopback test");
+	//test_results |= display_test_results( dspal_tester_spi_test(), "spi loopback test");
 	test_results |= display_test_results( dspal_tester_serial_test(), "serial I/O test");
+#if defined(DSP_TYPE_ADSP)
 	test_results |= display_test_results( dspal_tester_i2c_test(), "i2c test");
 
     test_results |= display_test_results( dspal_tester_termios_test(), "termios test");
 
-#if defined(DSP_TYPE_ADSP)
 	LOG_INFO("testing PWM signaling");
 	test_results |= display_test_results( dspal_tester_pwm_test(), "pwm_test");
-#endif
 
     LOG_INFO("testing FARF");
     test_results |= display_test_results( dspal_tester_test_farf_log_info(), "farf log_info test");
@@ -77,6 +76,7 @@ int run_io_test_suite()
 	test_results |= display_test_results( dspal_tester_test_fopen_fclose(), "fopen/fclose test");
 	test_results |= display_test_results( dspal_tester_test_fwrite_fread(), "fwrite/fread test");
 	test_results |= display_test_results( dspal_tester_test_posix_file_threading(), "fwrite/fread in a different thread test");
+#endif
 
 	return test_results;
 }
