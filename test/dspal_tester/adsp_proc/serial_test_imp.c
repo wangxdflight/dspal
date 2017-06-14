@@ -419,28 +419,49 @@ exit:
 	return result;
 }
 
+#define PACKET_INTERVAL_IN_USECS 2000  // 2ms
+
+int64_t get_time_1us(void)
+{
+   uint64_t timestamp = 0;
+
+   struct timespec ts = { 0, 0 };
+
+   clock_gettime(CLOCK_MONOTONIC, &ts);
+
+   timestamp += ts.tv_sec * 1000000;
+   timestamp += ts.tv_nsec / 1000;
+
+   return timestamp;
+}
+
 void* dspal_tester_serial_write(void* esc_fd)
 {
     int fd = (int)esc_fd; 
-
+    int repeat_cnt = 3;
+    int64_t last_packet_time_in_usecs = 0;
     /*Spin motor*/
     //uint8_t out[] = {0xAF, 0x0F, 0x01, 0x51, 0x00, 0x50, 0x00, 0x50, 0x00, 0x50, 0x00, 0xFF, 0x0F, 0x3F, 0xF6}; 
     int packet_size = sizeof(tx_data); 
 
-    for (int i = 0; i < 10000; i++) 
+    for (int i = 0; i < 50000; i++) 
     {
-        int num_bytes_written = write(fd,(const char *)tx_data,packet_size);
+        last_packet_time_in_usecs = get_time_1us();
+        for (int j = 0; j < repeat_cnt; j ++) 
+        {
+            int num_bytes_written = write(fd,(const char *)tx_data,packet_size);
 
-        if (num_bytes_written == packet_size) {
-            LOG_INFO("written %d bytes for i = %d ", num_bytes_written,i);
-
-        } else {
-            LOG_ERR("failed to write");
-            return NULL; 
+            if (num_bytes_written == packet_size) {
+                LOG_INFO("written %d bytes for i = %d ", num_bytes_written,i);
+            } else {
+                LOG_ERR("failed to write");
+                return NULL; 
+            }   
+            usleep(100);
         }
-
-        usleep(10000); 
-		//usleep(1000*1000); //added for serial TX debug;
+        int sleep_time = (int) (PACKET_INTERVAL_IN_USECS - (get_time_1us() - last_packet_time_in_usecs));
+        LOG_ERR("to sleep %d", sleep_time);
+        usleep(sleep_time); 
     }
 
 #if 0 
@@ -553,7 +574,7 @@ int dspal_tester_serial_open_write(void)
 	
 	
 exit:
-	LOG_INFO("serial multi-port open test %s",
+	LOG_INFO("serial open/ESC motor spin test %s",
 		 result == SUCCESS ? "PASSED" : "FAILED");
 
 	return result;
