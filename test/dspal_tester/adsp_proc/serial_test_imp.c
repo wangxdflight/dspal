@@ -43,6 +43,11 @@
 #include "test_utils.h"
 #include "test_status.h"
 
+#include "qc_esc_packet.h"
+#include "qc_esc_packet.c"
+#include "crc16.h"
+#include "crc16.c"
+
 #define SERIAL_TEST_CYCLES 10
 #define SERIAL_SIZE_OF_DATA_BUFFER 128
 #define SERIAL_WRITE_DELAY_IN_USECS (8000 * 10)
@@ -125,8 +130,8 @@ void multi_port_read_callback(void *context, char *buffer, size_t num_bytes)
 	if (num_bytes > 0) {
 		memcpy(rx_buffer, buffer, num_bytes);
 		rx_buffer[num_bytes] = 0;
-		LOG_INFO("/dev/tty-%d read callback received bytes [%d]: %s",
-			 rx_dev_id, num_bytes, rx_buffer);
+    //LOG_INFO("/dev/tty-%d read callback received bytes [%d]",
+    //   rx_dev_id, num_bytes);
 
 	} else {
 		LOG_ERR("error: read callback with no data in the buffer");
@@ -149,6 +154,65 @@ void multi_port_read_callback(void *context, char *buffer, size_t num_bytes)
 * - SUCCESS if write succeeds on all serial devices through SERIAL_TEST_CYCLES cycles
 * - Error otherwise
 */
+int dspal_tester_serial_read_callback(void)
+{
+  int runs;
+  int serial_fd = open("/dev/tty-5", O_RDWR);
+  
+  struct dspal_serial_ioctl_receive_data_callback receive_callback;
+  receive_callback.rx_data_callback_func_ptr = multi_port_read_callback;
+  receive_callback.context = (void *)(5);
+
+  struct dspal_serial_ioctl_data_rate data_rate;
+  data_rate.bit_rate = DSPAL_SIO_BITRATE_250000;
+
+  ioctl(serial_fd, SERIAL_IOCTL_SET_RECEIVE_DATA_CALLBACK, (void *)&receive_callback);
+  ioctl(serial_fd, SERIAL_IOCTL_SET_DATA_RATE, (void *)&data_rate);
+  
+  uint8_t tx_data[32];
+  
+        for (runs = 0; runs < 5000; runs++) {
+//                LOG_DEBUG("runs %d", runs);
+
+                int16_t rpm = 5000 + 2*runs;
+                
+                if (runs<100)  //reset potential snav condition
+                  rpm = 0;
+
+                int packet_size = qc_esc_create_rpm_packet4_fb(rpm, rpm, rpm, rpm,
+                                     0, 0, 0, 0,
+                                     runs%4, tx_data, sizeof(tx_data));
+                
+                if (packet_size < 1)
+                {
+                  LOG_ERR("bad packet size %d", packet_size);
+                }
+                else
+                {
+
+                  //uint8_t tx_data[] = {0xAF, 0x0F, 0x01, 0x51, 0x00, 0x50, 0x00, 0x50, 0x00, 0x50, 0x00, 0xFF, 0x0F, 0x3F, 0xF6};
+                  //int packet_size = sizeof(tx_data);
+                  int num_bytes_written = write(serial_fd, (const char *)tx_data, packet_size);
+                  usleep(100);
+                  num_bytes_written += write(serial_fd, (const char *)tx_data, packet_size);
+                  usleep(100);
+                  num_bytes_written += write(serial_fd, (const char *)tx_data, packet_size);
+  
+                  if (num_bytes_written == 3*packet_size) {
+                          LOG_INFO("written %d bytes for i = %d ", num_bytes_written, runs);
+                  } else {
+                          LOG_ERR("failed to write at %d", runs);
+                  }
+
+                }
+                usleep(1500);
+        }
+
+  close(serial_fd);
+  return SUCCESS;
+}
+
+
 int dspal_tester_serial_multi_port_write_read_callback(void)
 {
 	int result = SUCCESS;
@@ -489,7 +553,7 @@ void* dspal_tester_serial_write(void* esc_fd)
 
     return NULL; 
 }
-void dspal_tester_serial_read_callback(void *context, char *buffer, size_t num_bytes)
+void dspal_tester_serial_read_callback_(void *context, char *buffer, size_t num_bytes)
 {
 	int rx_dev_id = (int)context;
 	char rx_buffer[SERIAL_SIZE_OF_DATA_BUFFER];
@@ -525,9 +589,9 @@ int dspal_tester_serial_open_write(void)
         result = ERROR; 
         goto exit;
     }
-	
+#if 0	
 	struct dspal_serial_ioctl_receive_data_callback receive_callback;
-	receive_callback.rx_data_callback_func_ptr = dspal_tester_serial_read_callback;
+	receive_callback.rx_data_callback_func_ptr = dspal_tester_serial_read_callback_;
 	receive_callback.context = (void *)(5);
 	result = ioctl(esc_fd, 
 		       SERIAL_IOCTL_SET_RECEIVE_DATA_CALLBACK,
@@ -536,6 +600,7 @@ int dspal_tester_serial_open_write(void)
 		close(esc_fd);
 		esc_fd = -1;
 	}
+#endif
 	struct dspal_serial_ioctl_data_rate data_rate;
 	data_rate.bit_rate = DSPAL_SIO_BITRATE_250000;
 
@@ -591,7 +656,8 @@ exit:
 int dspal_tester_serial_test(void)
 {
 	int result;
-    result = dspal_tester_serial_open_write();
+    //result = dspal_tester_serial_open_write();
+    result = dspal_tester_serial_read_callback();
 	if (result < SUCCESS) {
 		return result;
 	}
