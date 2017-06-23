@@ -149,9 +149,9 @@ int main(int argc, char *argv[])
 
     if (argc < 2) {
          // run all
-         pthreads = 0; 
+         pthreads = 1; 
          timers   = 0; 
-         devices  = 1; 
+         devices  = 0; 
     }
 
 	LOG_INFO("Starting DSPAL tests");

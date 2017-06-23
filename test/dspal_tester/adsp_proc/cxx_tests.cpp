@@ -41,6 +41,19 @@
 
 #include "test_utils.h"
 #include "dspal_tester.h"
+#include <math.h>
+
+
+//FIXME: should these be sin or sinf, etc??
+#define SQRT  sqrtf
+#define SIN   sin
+#define COS   cos
+#define ACOS  acos
+#define ASIN  asin
+#define ATAN2 atan2
+#define ABS   fabs
+#define FABS  fabs
+
 
 #define SKIP_PTHREAD_KILL
 #define DSPAL_TESTER_COND_WAIT_TIMEOUT_IN_SECS 3
@@ -197,22 +210,75 @@ int dspal_tester_test_cxx_heap()
 	return rv;
 }
 // Test QDSP malloc heap size, up to 2MB
-int dspal_tester_test_malloc()
+int dspal_tester_test_malloc_()
 {
     int rv = TEST_PASS;
-    uint32_t malloc_size = 1024, total_loop = 2*1024;  // max is 2M;
-    for (uint32_t i = 300; i <= total_loop; i ++)   // SLPI default is 300KB
+    uint32_t i = 0, chunk_size = 10*1024, max_size = 2*1024*1024, size = 0; //max is 2MB;
+    uint8_t ** ptr_array = (uint8_t **) malloc(sizeof (uint8_t *) * (max_size/chunk_size));
+    for (int i = 0; i < (max_size/chunk_size); i ++)
+        ptr_array[i] = NULL;
+    for (size = chunk_size, i = 0; size  <= max_size; i ++)   // SLPI default is 300KB
     {
-        uint8_t * ptr = (uint8_t *) malloc(malloc_size * i);
+        uint8_t * ptr = (uint8_t *) malloc(chunk_size);
         if (ptr == NULL)
         {
-            LOG_ERR("malloc failed with size %dKB", i);
+            LOG_ERR("malloc failed with size %dKB", (size+chunk_size)/1024);
             rv = TEST_FAIL;
             break;
         }
-        LOG_ERR("malloc success with size %dKB", i);
-        free(ptr);
+        ptr_array[i] = ptr;
+        size += chunk_size;
+        LOG_ERR("malloc success with size %dKB", size/1024);
     }
-    return rv;
+    for (int i = 0; i < (max_size/chunk_size); i ++)
+        if (ptr_array[i] != NULL) free(ptr_array[i]);
+    free(ptr_array);
+    return size;
 }
+
+//uint32_t aa = 0x3F512255, bb = 0xBF5622D3;
+uint32_t aa = 0x3E6C07A1, bb = 0xBF607F8D;
+
+float a1 = *(float *) &aa, b1 = *(float *)&bb;
+float func3(float a, float b)
+{
+    int * p = (int *)0x0;
+    float c = atan2f(a1, b1);
+    c = atan2f(b1, a1);
+    c = atan2(a1, b1);
+    c = atan2(b1, a1);
+    //*p = 0x1;
+    return c;
+}
+void func2(int * para)
+{
+    char a[] = "abcdefg";
+    int local = * para;
+    LOG_ERR("to crash it");
+    float b1 = 1e-8, b2 = 2.0, b3 = 0;
+    float c = atan2f(b1, b2) + atan2f(b2, b1) + atan2f(b2, b3) + atan2f(b3, b2) + func3(1e-6, 1e-6);
+    LOG_ERR("test done it");
+    int x=0;
+    int y=10/x;
+    LOG_ERR("test done again? %d", y);
+
+}
+int func1(__uint8_t * para1, int para2)
+{
+    char b[] = "zyxwvut";
+    __uint8_t val = * para1;
+    LOG_ERR("to call func");
+    func2(&para2);
+    return 0;
+}
+int dspal_tester_test_malloc()
+{
+    char c[] = "hijklmn";
+    int size = 1;
+    __uint8_t para1 = 2;
+    int para2 = 3;
+    func1(&para1, para2);
+    return size;
+}
+
 

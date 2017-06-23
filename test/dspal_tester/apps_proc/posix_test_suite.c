@@ -88,8 +88,10 @@ int run_pthreads_test_suite()
 	int test_results = TEST_PASS;
 
 	LOG_INFO("testing malloc size");
-    test_results |= display_test_results( dspal_tester_test_malloc(), "malloc size test");
-    
+    LOG_INFO("malloc successfully until %dKB", dspal_tester_test_malloc()/1024);
+    //test_results |= display_test_results( dspal_tester_test_malloc(), "malloc size test");
+
+#if defined(DSP_TYPE_ADSP)    
     LOG_INFO("HAP power API test");
     test_results |= display_test_results( run_HAP_power_test(), "HAP power API test"); 
 
@@ -119,7 +121,7 @@ int run_pthreads_test_suite()
 
     LOG_INFO("testing rpcmem");
     test_results |= display_test_results( run_rpcmem_test(), "RPC memory test"); 
-
+#endif
     
 	LOG_INFO("pthread tests complete");
 
