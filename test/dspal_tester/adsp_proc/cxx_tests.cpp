@@ -271,7 +271,7 @@ int func1(__uint8_t * para1, int para2)
     func2(&para2);
     return 0;
 }
-int dspal_tester_test_malloc()
+int dspal_tester_test_malloc_2()
 {
     char c[] = "hijklmn";
     int size = 1;
@@ -281,4 +281,22 @@ int dspal_tester_test_malloc()
     return size;
 }
 
+int dspal_tester_test_malloc()
+{
+    unsigned int x, y;
+    while(1) {
+        x = 0xBEB4D826; y = 0x3F69B34B;
+        //x = 0x3E6C07A1; y = 0xBF607F8D;
+
+        atan2f((float)x, (float)y);
+        atan2f((float)y, (float)x);
+
+        float x2 = *(float*)&x;
+        float y2 = *(float*)&y;
+        atan2f(x2, y2);
+        atan2f(y2, x2);
+        LOG_INFO("atan2f result %f, %f, %f, %f, %f", atan2f((float)y, (float)x), x2, y2, (float)x, (float)y);
+    }
+    return SUCCESS;
+}
 

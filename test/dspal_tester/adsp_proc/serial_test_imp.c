@@ -39,6 +39,7 @@
 #include <dev_fs_lib_serial.h>
 #include <platform.h>
 #include <pthread.h>
+#include <math.h>
 
 #include "test_utils.h"
 #include "test_status.h"
@@ -498,7 +499,24 @@ int64_t get_time_1us(void)
 
    return timestamp;
 }
+void* dspal_tester_helper_thread_proc(void* esc_fd)
+{
+    unsigned int x, y;
+    while(1) {
+        x = 0xBEB4D826; y = 0x3F69B34B;
+        //x = 0x3E6C07A1; y = 0xBF607F8D;
 
+        atan2f((float)x, (float)y);
+        atan2f((float)y, (float)x);
+
+        float x2 = *(float*)&x;
+        float y2 = *(float*)&y;
+        atan2f(x2, y2);
+        atan2f(y2, x2);
+        LOG_INFO("atan2f result %f, %f, %f, %f, %f", atan2f((float)y, (float)x), x2, y2, (float)x, (float)y);
+    }
+    return NULL;
+}
 void* dspal_tester_serial_write(void* esc_fd)
 {
     int fd = (int)esc_fd; 
@@ -608,7 +626,7 @@ int dspal_tester_serial_open_write(void)
 
     pthread_t thread;
     pthread_attr_t attr;
-    size_t stacksize = 2 * 1024;
+    size_t stacksize = 4 * 1024;
 
     int rv = pthread_attr_init(&attr);
 
@@ -618,12 +636,30 @@ int dspal_tester_serial_open_write(void)
 
     if (rv != 0) { FAIL("pthread_attr_setstacksize returned error"); }
 
+    rv = pthread_attr_init(&attr);
+    if (rv != 0) 
+    { 
+       FARF(ALWAYS, "pthread_attr_init returned error"); 
+    }
+
+    rv = pthread_attr_setstacksize(&attr, stacksize);
+    if (rv != 0) 
+    { 
+       FARF(ALWAYS, "pthread_attr_setstacksize returned error"); 
+    }
+    attr.priority = 255 - 15;
+
+    pthread_attr_setthreadname(&attr, "tester");
+
+    FARF(ALWAYS, "creat tester thread for dspal_tester"); 
+
     /*
      * Create the thread passing a reference to the cond structure
      * just initialized.
      */
-    rv = pthread_create(&thread, &attr, dspal_tester_serial_write, (void*)esc_fd);
-
+    //rv = pthread_create(&thread, &attr, dspal_tester_serial_write, (void*)esc_fd);
+    // this is to test atan2f function issue;
+    rv = pthread_create(&thread, &attr, dspal_tester_helper_thread_proc((void *)esc_fd), (void*)esc_fd);
     if (rv != 0) {
         LOG_ERR("error pthread_create: %d", rv);
         goto exit;
@@ -656,8 +692,8 @@ exit:
 int dspal_tester_serial_test(void)
 {
 	int result;
-    //result = dspal_tester_serial_open_write();
-    result = dspal_tester_serial_read_callback();
+    result = dspal_tester_serial_open_write();
+    //result = dspal_tester_serial_read_callback();
 	if (result < SUCCESS) {
 		return result;
 	}
